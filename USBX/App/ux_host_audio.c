@@ -261,15 +261,8 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
       transfer_request2.ux_host_class_audio_transfer_request_actual_length = nominal_packet_size;
 
       /** Queue requests */
-      status = ux_host_class_audio_write(usb_audio_host.out_audio, &transfer_request1);
-      if (status != UX_SUCCESS) {
-        usb_audio_host.out_state = USB_AUDIO_HOST_STATE_ERROR;
-      }
-
-      status = ux_host_class_audio_write(usb_audio_host.out_audio, &transfer_request2);
-      if (status != UX_SUCCESS) {
-        usb_audio_host.out_state = USB_AUDIO_HOST_STATE_ERROR;
-      }
+      ux_host_class_audio_write(usb_audio_host.out_audio, &transfer_request1);
+      ux_host_class_audio_write(usb_audio_host.out_audio, &transfer_request2);
 
       buf_index = 0;
 
@@ -301,7 +294,7 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
 
       memset(p_data, 0x00, nominal_packet_size);
 
-      /** Fill data with next bytes */
+      /** Fill buffer with next samples */
       fill_buf((SHORT*) p_data, nominal_packet_size / subframe_size);
 
       /** Start next transfer request */
