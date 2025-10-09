@@ -58,7 +58,7 @@ __ALIGN_BEGIN static UCHAR tx_byte_pool_buffer[TX_APP_MEM_POOL_SIZE] __ALIGN_END
 static TX_BYTE_POOL tx_app_byte_pool;
 
 /* USER CODE BEGIN UX_HOST_Pool_Buffer */
-USBX_MEMORY
+USBX_POOL_MEMORY
 /* USER CODE END UX_HOST_Pool_Buffer */
 #if defined ( __ICCARM__ )
 #pragma data_alignment=4

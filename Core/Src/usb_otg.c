@@ -21,7 +21,7 @@
 #include "usb_otg.h"
 
 /* USER CODE BEGIN 0 */
-
+#include "app_azure_rtos_config.h"
 /* USER CODE END 0 */
 
 HCD_HandleTypeDef hhcd_USB_OTG_HS;

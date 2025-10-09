@@ -74,3 +74,20 @@ add_custom_command(
     COMMAND ${CMAKE_OBJCOPY} -O binary ${CMAKE_PROJECT_NAME}.elf ${CMAKE_PROJECT_NAME}.bin
     COMMENT "Generating hex and bin files"
 )
+
+add_custom_target(
+    GenerateDissassembly ALL
+    DEPENDS ${CMAKE_PROJECT_NAME}
+    
+    COMMAND ${CMAKE_OBJDUMP} -d ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}.elf > ${CMAKE_PROJECT_NAME}-dissasembly.txt
+    COMMAND ${CMAKE_OBJDUMP} -x ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}.elf > ${CMAKE_PROJECT_NAME}-memory.txt
+    COMMENT "Generating dissasembly"
+)
+
+add_custom_target(
+    GenerateSymbols ALL
+    DEPENDS ${CMAKE_PROJECT_NAME}
+    
+    COMMAND ${CMAKE_NM} ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}.elf > ${CMAKE_PROJECT_NAME}-symbols.txt
+    COMMENT "Generating symbols list"
+)

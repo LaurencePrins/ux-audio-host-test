@@ -34,6 +34,22 @@ extern "C" {
   #define USBX_MEMORY \
       __attribute__((section(".usbx_memory")))
 #endif
+
+#if defined( __ICCARM__ )
+  #define USBX_POOL_MEMORY \
+      _Pragma("location=\".UsbxPoolSection\"")
+#else
+  #define USBX_POOL_MEMORY \
+      __attribute__((section(".UsbxPoolSection")))
+#endif
+
+#if defined( __ICCARM__ )
+  #define USBX_HPCD_MEMORY \
+      _Pragma("location=\".UsbHpcdSection\"")
+#else
+  #define USBX_HPCD_MEMORY \
+      __attribute__((section(".UsbHpcdSection")))
+#endif
 /* USER CODE END 1 */
 
 /* Includes ------------------------------------------------------------------*/
@@ -55,7 +71,7 @@ extern "C" {
 
 #define TX_APP_MEM_POOL_SIZE                     40*1024
 
-#define UX_HOST_APP_MEM_POOL_SIZE                64*1024
+#define UX_HOST_APP_MEM_POOL_SIZE                32*1024
 
 /* USER CODE BEGIN EC */
 
