@@ -568,7 +568,6 @@ void HAL_HCD_IRQHandler(HCD_HandleTypeDef *hhcd)
       if ((USBx_HPRT0 & USB_OTG_HPRT_PCSTS) == 0U)
       {
         /* Flush USB Fifo */
-#define USE_DMA_WORKAROUND 1
 #if USE_DMA_WORKAROUND
         if (hhcd->Init.dma_enable == 0U)
         {
