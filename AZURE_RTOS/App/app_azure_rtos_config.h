@@ -28,14 +28,6 @@ extern "C" {
 
 /* USER CODE BEGIN 1 */
 #if defined( __ICCARM__ )
-  #define USBX_MEMORY \
-      _Pragma("location=\".usbx_memory\"")
-#else
-  #define USBX_MEMORY \
-      __attribute__((section(".usbx_memory")))
-#endif
-
-#if defined( __ICCARM__ )
   #define USBX_POOL_MEMORY \
       _Pragma("location=\".UsbxPoolSection\"")
 #else
@@ -49,6 +41,14 @@ extern "C" {
 #else
   #define USBX_HPCD_MEMORY \
       __attribute__((section(".UsbHpcdSection")))
+#endif
+
+#if defined( __ICCARM__ )
+  #define USBX_MEMORY \
+      _Pragma("location=\".usbx_memory\"")
+#else
+  #define USBX_MEMORY \
+      __attribute__((section(".usbx_memory")))
 #endif
 /* USER CODE END 1 */
 

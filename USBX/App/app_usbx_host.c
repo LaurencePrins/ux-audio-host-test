@@ -195,7 +195,9 @@ UINT ux_host_event_callback(ULONG event, UX_HOST_CLASS *current_class, VOID *cur
     case UX_DEVICE_INSERTION:
 
       /* USER CODE BEGIN UX_DEVICE_INSERTION */
+      printf("Device inserted\r\n");
       if (current_class->ux_host_class_entry_function == ux_host_class_audio_entry) {
+
         usb_audio_host_inserted((UX_HOST_CLASS_AUDIO *) current_instance);
       }
 
@@ -206,6 +208,7 @@ UINT ux_host_event_callback(ULONG event, UX_HOST_CLASS *current_class, VOID *cur
     case UX_DEVICE_REMOVAL:
 
       /* USER CODE BEGIN UX_DEVICE_REMOVAL */
+      printf("Device Removed\r\n");
       if (current_class->ux_host_class_entry_function == ux_host_class_audio_entry) {
         usb_audio_host_removed((UX_HOST_CLASS_AUDIO *) current_instance);
       }
@@ -216,6 +219,7 @@ UINT ux_host_event_callback(ULONG event, UX_HOST_CLASS *current_class, VOID *cur
     case UX_DEVICE_CONNECTION:
 
       /* USER CODE BEGIN UX_DEVICE_CONNECTION */
+      printf("Device Connection\r\n");
       tx_event_flags_set(&usb_host_events, 0x00, TX_AND);
       tx_event_flags_set(&usb_host_events, USB_HOST_EVENT_FLAG_CONNECTED, TX_OR);
       /* USER CODE END UX_DEVICE_CONNECTION */
@@ -225,6 +229,7 @@ UINT ux_host_event_callback(ULONG event, UX_HOST_CLASS *current_class, VOID *cur
     case UX_DEVICE_DISCONNECTION:
 
       /* USER CODE BEGIN UX_DEVICE_DISCONNECTION */
+      printf("Device Disconnection\r\n");
       tx_event_flags_set(&usb_host_events, 0x00, TX_AND);
       tx_event_flags_set(&usb_host_events, USB_HOST_EVENT_FLAG_DISCONNECTED, TX_OR);
       /* USER CODE END UX_DEVICE_DISCONNECTION */

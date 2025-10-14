@@ -28,6 +28,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "app_usbx_host.h"
+#include "main.h"
+#include "app_azure_rtos_config.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,7 +51,7 @@ typedef enum {
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 #define USB_AUDIO_HOST_OUT_THREAD_STACKSIZE   5 * 1024
-#define USB_AUDIO_HOST_OUT_THREAD_PRIORITY    7
+#define USB_AUDIO_HOST_OUT_THREAD_PRIORITY    TX_MAX_PRIORITIES-1
 #define USB_AUDIO_HOST_OUT_THREAD_NAME        "usb_host_audio_out_task"
 
 #define USB_AUDIO_HOST_OUT_SAMPLE_RATE_HZ     (48000)
@@ -125,7 +127,7 @@ struct {
   UINT frequency_hz;
   UINT sample_rate_hz;
   UCHAR n_ch;
-} sine_generator;
+}  sine_generator;
 
 struct {
   usb_audio_host_state_t out_state;
@@ -133,6 +135,9 @@ struct {
   TX_SEMAPHORE out_event_sem;
   UX_HOST_CLASS_AUDIO *out_audio;
   ULONG xfer_count;
+  
+  UCHAR *buf1;
+  UCHAR *buf2;
 } usb_audio_host;
 
 
@@ -177,7 +182,7 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
   UINT subframe_size, frame_size;
   ULONG nominal_packet_size;
 
-  UCHAR *buf1, *buf2, *p_data;
+  UCHAR *p_data = NULL;
 
   UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST transfer_request1, transfer_request2;
   UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST *current_transfer_request;
@@ -203,7 +208,6 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
         break;
       }
 
-
       /** Set these to static values for now, but would ideally support more devices */
       audio_sampling.ux_host_class_audio_sampling_channels = USB_AUDIO_HOST_OUT_NUM_CHANNELS;
       audio_sampling.ux_host_class_audio_sampling_frequency = USB_AUDIO_HOST_OUT_SAMPLE_RATE_HZ;
@@ -221,17 +225,32 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
       nominal_packet_size = (audio_sampling.ux_host_class_audio_sampling_frequency / 1000) * frame_size;
 
       /** Allocate buffer 1 */
-      buf1 = ux_utility_memory_allocate(UX_ALIGN_32, UX_CACHE_SAFE_MEMORY, nominal_packet_size);
-      if (buf1 == NULL) {
+      if (usb_audio_host.buf1 != NULL) {
+        ux_utility_memory_free(usb_audio_host.buf1);
+        usb_audio_host.buf1 = NULL;
+      }
+      
+      usb_audio_host.buf1 = ux_utility_memory_allocate(UX_ALIGN_32, UX_CACHE_SAFE_MEMORY, nominal_packet_size);
+      
+      if (usb_audio_host.buf1 == NULL) {
         /** Failed to allocate memory for buffer */
         usb_audio_host.out_state = USB_AUDIO_HOST_STATE_ERROR;
+        break;
       }
 
+
       /** Allocate buffer 2 */
-      buf2 = ux_utility_memory_allocate(UX_ALIGN_32, UX_CACHE_SAFE_MEMORY, nominal_packet_size);
-      if (buf2 == NULL) {
+      if (usb_audio_host.buf2 != NULL) {
+        ux_utility_memory_free(usb_audio_host.buf2);
+        usb_audio_host.buf2 = NULL;
+      }
+
+      usb_audio_host.buf2 = ux_utility_memory_allocate(UX_ALIGN_32, UX_CACHE_SAFE_MEMORY, nominal_packet_size);
+      
+      if (usb_audio_host.buf2 == NULL) {
         /** Failed to allocate memory for buffer */
         usb_audio_host.out_state = USB_AUDIO_HOST_STATE_ERROR;
+        break;
       }
 
       /** Setup sine generator for filling buffers with dummy values */
@@ -241,12 +260,12 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
       sine_generator.n_ch = audio_sampling.ux_host_class_audio_sampling_channels;
 
       /** Fill buf1 and buf2 with sine wave */
-      fill_buf((SHORT*) buf1, nominal_packet_size / subframe_size);
-      fill_buf((SHORT*) buf2, nominal_packet_size / subframe_size);
+      fill_buf((SHORT*) usb_audio_host.buf1, nominal_packet_size / subframe_size);
+      fill_buf((SHORT*) usb_audio_host.buf2, nominal_packet_size / subframe_size);
 
       /** Prepare transfer request 1 */
       transfer_request1.ux_host_class_audio_transfer_request_completion_function = &usb_audio_host_out_transfer_request_completion_cb;
-      transfer_request1.ux_host_class_audio_transfer_request_data_pointer = buf1;
+      transfer_request1.ux_host_class_audio_transfer_request_data_pointer = usb_audio_host.buf1;
       transfer_request1.ux_host_class_audio_transfer_request_class_instance = usb_audio_host.out_audio;
       transfer_request1.ux_host_class_audio_transfer_request_requested_length = nominal_packet_size;
       transfer_request1.ux_host_class_audio_transfer_request_packet_size = nominal_packet_size;
@@ -254,7 +273,7 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
 
       /** Prepare transfer request 2 */
       transfer_request2.ux_host_class_audio_transfer_request_completion_function = &usb_audio_host_out_transfer_request_completion_cb;
-      transfer_request2.ux_host_class_audio_transfer_request_data_pointer = buf2;
+      transfer_request2.ux_host_class_audio_transfer_request_data_pointer = usb_audio_host.buf2;
       transfer_request2.ux_host_class_audio_transfer_request_class_instance = usb_audio_host.out_audio;
       transfer_request2.ux_host_class_audio_transfer_request_requested_length = nominal_packet_size;
       transfer_request2.ux_host_class_audio_transfer_request_packet_size = nominal_packet_size;
@@ -315,13 +334,13 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
 
       /** Release memory etc. */
       if (transfer_request1.ux_host_class_audio_transfer_request_data_pointer != NULL) {
-        ux_utility_memory_free(buf1);
-        buf1 = NULL;
+        ux_utility_memory_free(usb_audio_host.buf1);
+        usb_audio_host.buf1 = NULL;
       }
 
       if (transfer_request2.ux_host_class_audio_transfer_request_data_pointer != NULL) {
-        ux_utility_memory_free(buf2);
-        buf2 = NULL;
+        ux_utility_memory_free(usb_audio_host.buf2);
+        usb_audio_host.buf2 = NULL;
       }
 
       usb_audio_host.out_state = USB_AUDIO_HOST_STATE_IDLE;
@@ -348,6 +367,7 @@ static void usb_audio_host_out_transfer_request_completion_cb(UX_HOST_CLASS_AUDI
 
   /* Release the semaphore */
   usb_audio_host.xfer_count += 1;
+  printf("xfer %ld\r\n", usb_audio_host.xfer_count);
   tx_semaphore_put(&usb_audio_host.out_event_sem);
 }
 /* USER CODE END 0 */

@@ -21,10 +21,13 @@
 #include "usb_otg.h"
 
 /* USER CODE BEGIN 0 */
+#include <string.h>
 #include "app_azure_rtos_config.h"
+
+USBX_HPCD_MEMORY
 /* USER CODE END 0 */
 
-HCD_HandleTypeDef hhcd_USB_OTG_HS;
+HCD_HandleTypeDef hhcd_USB_OTG_HS = { 0 };
 
 /* USB_OTG_HS init function */
 
@@ -32,7 +35,7 @@ void MX_USB_OTG_HS_HCD_Init(void)
 {
 
   /* USER CODE BEGIN USB_OTG_HS_Init 0 */
-
+  memset(&hhcd_USB_OTG_HS, 0x0, sizeof(HCD_HandleTypeDef));
   /* USER CODE END USB_OTG_HS_Init 0 */
 
   /* USER CODE BEGIN USB_OTG_HS_Init 1 */

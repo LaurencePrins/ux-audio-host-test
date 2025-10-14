@@ -55,7 +55,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32h7xx_hal.h"
-
+#include <stdio.h>
 /** @addtogroup STM32H7xx_HAL_Driver
   * @{
   */
@@ -539,6 +539,7 @@ void HAL_HCD_IRQHandler(HCD_HandleTypeDef *hhcd)
     {
       /* Incorrect mode, acknowledge the interrupt */
       __HAL_HCD_CLEAR_FLAG(hhcd, USB_OTG_GINTSTS_PXFR_INCOMPISOOUT);
+      printf("INCOMPISOOUT\r\n");
     }
 
     if (__HAL_HCD_GET_FLAG(hhcd, USB_OTG_GINTSTS_IISOIXFR))
@@ -567,6 +568,7 @@ void HAL_HCD_IRQHandler(HCD_HandleTypeDef *hhcd)
       if ((USBx_HPRT0 & USB_OTG_HPRT_PCSTS) == 0U)
       {
         /* Flush USB Fifo */
+#define USE_DMA_WORKAROUND 1
 #if USE_DMA_WORKAROUND
         if (hhcd->Init.dma_enable == 0U)
         {
