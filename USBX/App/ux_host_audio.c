@@ -135,6 +135,8 @@ struct {
   TX_SEMAPHORE out_event_sem;
   UX_HOST_CLASS_AUDIO *out_audio;
   ULONG xfer_count;
+  UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST transfer_request1;
+  UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST transfer_request2;
 } usb_audio_host;
 
 
@@ -184,15 +186,14 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
   UCHAR *local_frame_buffer2 = NULL;
   UCHAR *p_data = NULL;
 
-  UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST transfer_request1, transfer_request2;
   UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST *current_transfer_request = NULL;
   UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST *previous_transfer_request = NULL;
 
   UINT buf_index;
   
   ux_utility_memory_set(&audio_sampling, 0, sizeof(UX_HOST_CLASS_AUDIO_SAMPLING));
-  ux_utility_memory_set(&transfer_request1, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
-  ux_utility_memory_set(&transfer_request2, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
+  ux_utility_memory_set(&usb_audio_host.transfer_request1, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
+  ux_utility_memory_set(&usb_audio_host.transfer_request2, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
 
   while (1)
   {
@@ -269,26 +270,33 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
       fill_buf((SHORT*) local_frame_buffer2, nominal_packet_size / subframe_size);
 
       /** Prepare transfer request 1 */
-      transfer_request1.ux_host_class_audio_transfer_request_completion_function = &usb_audio_host_out_transfer_request_completion_cb;
-      transfer_request1.ux_host_class_audio_transfer_request_data_pointer = local_frame_buffer1;
-      transfer_request1.ux_host_class_audio_transfer_request_class_instance = usb_audio_host.out_audio;
-      transfer_request1.ux_host_class_audio_transfer_request_requested_length = nominal_packet_size;
-      transfer_request1.ux_host_class_audio_transfer_request_packet_size = nominal_packet_size;
-      transfer_request1.ux_host_class_audio_transfer_request_actual_length = nominal_packet_size;
-      transfer_request1.ux_host_class_audio_transfer_request_next_audio_transfer_request = &transfer_request2;
+      usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request_completion_function = &usb_audio_host_out_transfer_request_completion_cb;
+      usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request_data_pointer = local_frame_buffer1;
+      usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request_class_instance = usb_audio_host.out_audio;
+      usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request_requested_length = nominal_packet_size;
+      usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request_packet_size = nominal_packet_size;
+      usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request_actual_length = nominal_packet_size;
+      usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request_next_audio_transfer_request = &usb_audio_host.transfer_request2;
+      usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request_completion_code = UX_TRANSFER_STATUS_PENDING;
 
       /** Prepare transfer request 2 */
-      transfer_request2.ux_host_class_audio_transfer_request_completion_function = &usb_audio_host_out_transfer_request_completion_cb;
-      transfer_request2.ux_host_class_audio_transfer_request_data_pointer = local_frame_buffer2;
-      transfer_request2.ux_host_class_audio_transfer_request_class_instance = usb_audio_host.out_audio;
-      transfer_request2.ux_host_class_audio_transfer_request_requested_length = nominal_packet_size;
-      transfer_request2.ux_host_class_audio_transfer_request_packet_size = nominal_packet_size;
-      transfer_request2.ux_host_class_audio_transfer_request_actual_length = nominal_packet_size;
-      transfer_request2.ux_host_class_audio_transfer_request_next_audio_transfer_request = UX_NULL;
+      usb_audio_host.transfer_request2.ux_host_class_audio_transfer_request_completion_function = &usb_audio_host_out_transfer_request_completion_cb;
+      usb_audio_host.transfer_request2.ux_host_class_audio_transfer_request_data_pointer = local_frame_buffer2;
+      usb_audio_host.transfer_request2.ux_host_class_audio_transfer_request_class_instance = usb_audio_host.out_audio;
+      usb_audio_host.transfer_request2.ux_host_class_audio_transfer_request_requested_length = nominal_packet_size;
+      usb_audio_host.transfer_request2.ux_host_class_audio_transfer_request_packet_size = nominal_packet_size;
+      usb_audio_host.transfer_request2.ux_host_class_audio_transfer_request_actual_length = nominal_packet_size;
+      usb_audio_host.transfer_request2.ux_host_class_audio_transfer_request_next_audio_transfer_request = UX_NULL;
+      usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request_completion_code = UX_TRANSFER_STATUS_PENDING;
+
+      while (usb_audio_host.out_event_sem.tx_semaphore_count > 0) {
+        tx_semaphore_get(&usb_audio_host.out_event_sem, TX_NO_WAIT);
+      }
+      printf("Starting, sem count %ld\r\n", usb_audio_host.out_event_sem.tx_semaphore_count);
 
       /** Queue requests */
-      ux_host_class_audio_write(usb_audio_host.out_audio, &transfer_request1);
-      ux_host_class_audio_write(usb_audio_host.out_audio, &transfer_request2);
+      ux_host_class_audio_write(usb_audio_host.out_audio, &usb_audio_host.transfer_request1);
+      ux_host_class_audio_write(usb_audio_host.out_audio, &usb_audio_host.transfer_request2);
 
       buf_index = 0;
 
@@ -310,14 +318,14 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
       /** Determine which transfer just completed and which to send next */
       if (buf_index == 0) {
         p_data = local_frame_buffer1;
-        current_transfer_request = &transfer_request1;
-        previous_transfer_request = &transfer_request2;
+        current_transfer_request = &usb_audio_host.transfer_request1;
+        previous_transfer_request = &usb_audio_host.transfer_request2;
         buf_index = 1;
       } 
       else {
         p_data = local_frame_buffer2;
-        current_transfer_request = &transfer_request2;
-        previous_transfer_request = &transfer_request1;
+        current_transfer_request = &usb_audio_host.transfer_request2;
+        previous_transfer_request = &usb_audio_host.transfer_request1;
         buf_index = 0;
       } 
 
@@ -337,31 +345,44 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
       current_transfer_request->ux_host_class_audio_transfer_request_next_audio_transfer_request = UX_NULL;
       previous_transfer_request->ux_host_class_audio_transfer_request_next_audio_transfer_request = current_transfer_request;
 
+      current_transfer_request->ux_host_class_audio_transfer_request_completion_code = UX_TRANSFER_STATUS_PENDING;
+
       ux_host_class_audio_write(usb_audio_host.out_audio, current_transfer_request);
       break;
     }
 
     case USB_AUDIO_HOST_STATE_STOPPING: {
       
-      tx_thread_sleep(10);
+      if (usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request.ux_transfer_request_completion_code == UX_TRANSFER_STATUS_PENDING) {
+        /** Will get stuck here forever if the transfer request never completes.. */
+        printf("Waiting on pending request 1\r\n");
+        tx_semaphore_get(&usb_audio_host.out_event_sem, TX_WAIT_FOREVER);
+      }
+
+      if (usb_audio_host.transfer_request2.ux_host_class_audio_transfer_request.ux_transfer_request_completion_code == UX_TRANSFER_STATUS_PENDING) {
+        /** Will get stuck here forever if the transfer request never completes.. */
+        printf("Waiting on pending request 2\r\n");
+        tx_semaphore_get(&usb_audio_host.out_event_sem, TX_WAIT_FOREVER);
+      }
+
       /** Wait until disconnection then return to idle state */
       tx_event_flags_get(&usb_host_events, USB_HOST_EVENT_FLAG_DISCONNECTED, TX_OR, &actual_flags, TX_WAIT_FOREVER);
       usb_audio_host.out_state = USB_AUDIO_HOST_STATE_IDLE;
 
       /** Release memory etc. */
-      if (transfer_request1.ux_host_class_audio_transfer_request_data_pointer != NULL) {
+      if (usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request_data_pointer != NULL) {
         ux_utility_memory_free(local_frame_buffer1);
         local_frame_buffer1 = NULL;
       }
-     
-      if (transfer_request2.ux_host_class_audio_transfer_request_data_pointer != NULL) {
+
+      if (usb_audio_host.transfer_request2.ux_host_class_audio_transfer_request_data_pointer != NULL) {
         ux_utility_memory_free(local_frame_buffer2);
         local_frame_buffer2 = NULL;
       }
 
       ux_utility_memory_set(&audio_sampling, 0, sizeof(UX_HOST_CLASS_AUDIO_SAMPLING));
-      ux_utility_memory_set(&transfer_request1, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
-      ux_utility_memory_set(&transfer_request2, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
+      ux_utility_memory_set(&usb_audio_host.transfer_request1, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
+      ux_utility_memory_set(&usb_audio_host.transfer_request2, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
       ux_utility_memory_set(current_transfer_request, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
       ux_utility_memory_set(previous_transfer_request, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
 
@@ -389,7 +410,10 @@ static void usb_audio_host_out_transfer_request_completion_cb(UX_HOST_CLASS_AUDI
 
   /* Release the semaphore */
   usb_audio_host.xfer_count += 1;
-  printf("xfer %ld\r\n", usb_audio_host.xfer_count);
+  if (transfer_request->ux_host_class_audio_transfer_request_completion_code != UX_SUCCESS) {
+    printf("Transfer status: %d\r\n", transfer_request->ux_host_class_audio_transfer_request_completion_code);
+  }
+  // printf("xfer %ld\r\n", usb_audio_host.xfer_count);
   tx_semaphore_put(&usb_audio_host.out_event_sem);
 }
 /* USER CODE END 0 */
@@ -437,6 +461,22 @@ VOID usb_audio_host_removed(UX_HOST_CLASS_AUDIO *audio)
 {
   if (audio == usb_audio_host.out_audio) {
     usb_audio_host.out_audio = NULL;
+
+    /** 
+     * In the UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST struct the ux_host_class_audio_transfer_request_status is never touched, 
+     * and the ux_host_class_audio_transfer_request_completion_code field is only updated on completion.
+     * So to check if the request is still pending have to check the completion code of the underlying transfer request.
+     **/
+    if (usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request.ux_transfer_request_completion_code == UX_TRANSFER_STATUS_PENDING) {
+      printf("Aborting transfer request 1\r\n");
+      _ux_host_stack_transfer_request_abort(&usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request);
+    }
+
+    if (usb_audio_host.transfer_request2.ux_host_class_audio_transfer_request.ux_transfer_request_completion_code == UX_TRANSFER_STATUS_PENDING) {
+      printf("Aborting transfer request 2\r\n");
+      _ux_host_stack_transfer_request_abort(&usb_audio_host.transfer_request2.ux_host_class_audio_transfer_request);
+    }
+
     tx_semaphore_put(&usb_audio_host.out_event_sem);
   }
 }
