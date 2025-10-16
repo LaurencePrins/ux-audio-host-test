@@ -222,6 +222,7 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
       if (status != UX_SUCCESS) {
         /** Do not support this device, wait until disconnected and retry */
         usb_audio_host.out_state = USB_AUDIO_HOST_STATE_ERROR;
+        break;
       }
 
       /** Determine subframe size, framesize and packet size. Assume full-speed frequency. */
@@ -232,6 +233,7 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
 
       /** Allocate buffer 1 */
       if (local_frame_buffer1 != NULL) {
+        /** If not NULL then something went wrong in STOPPING state. */
         ux_utility_memory_free(local_frame_buffer1);
         local_frame_buffer1 = NULL;
       }
@@ -290,9 +292,9 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
       usb_audio_host.transfer_request1.ux_host_class_audio_transfer_request_completion_code = UX_TRANSFER_STATUS_PENDING;
 
       while (usb_audio_host.out_event_sem.tx_semaphore_count > 0) {
+        /** Just incase drain the semaphores, should really be 0 here anyway. */
         tx_semaphore_get(&usb_audio_host.out_event_sem, TX_NO_WAIT);
       }
-      printf("Starting, sem count %ld\r\n", usb_audio_host.out_event_sem.tx_semaphore_count);
 
       /** Queue requests */
       ux_host_class_audio_write(usb_audio_host.out_audio, &usb_audio_host.transfer_request1);
