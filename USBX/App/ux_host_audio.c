@@ -30,6 +30,7 @@
 #include "app_usbx_host.h"
 #include "main.h"
 #include "app_azure_rtos_config.h"
+#include "usb_otg.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -387,6 +388,9 @@ static void usb_audio_host_out_audio_entry(ULONG thread_input)
       ux_utility_memory_set(&usb_audio_host.transfer_request2, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
       ux_utility_memory_set(current_transfer_request, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
       ux_utility_memory_set(previous_transfer_request, 0, sizeof(UX_HOST_CLASS_AUDIO_TRANSFER_REQUEST));
+
+      HAL_HCD_Init(&hhcd_USB_OTG_HS);
+      HAL_HCD_Start(&hhcd_USB_OTG_HS);
 
       usb_audio_host.out_state = USB_AUDIO_HOST_STATE_IDLE;
       break;
